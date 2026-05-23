@@ -1,17 +1,13 @@
+import base64
 import os
+import sys
 
-target_file="sample.exe"
+print("Dummy malware execution started.")
 
-with open(target_file,"wb") as f:
-    f.write(b"MZ")
-    f.write(b"\x00"*60)
-    f.write(b"PE\x00\x00")
-    f.write(b"\x00"*20)
-    f.write(os.urandom(4096))
-    f.write(b"powershell.exe -encodedcommand ")
-    f.write(b"VirtualAlloc ")
-    f.write(b"http://malicious-dummy-domain.com/payload.exe ")
-    f.write(b"cmd.exe /c ")
-    f.write(b"RunOnce ")
+target_domain=base64.b64decode(b"aHR0cDovL21hbGljaW91cy1kb21haW4uY29tL3BheWxvYWQuZXhl")
+print(target_domain)
 
-print("Dummy malware sample generated: sample.exe")
+suspicious_cmd="powershell.exe -encodedcommand ZQBjAGgAbwAgACIAaABhAGMAawBlAGQAIgA="
+print(suspicious_cmd)
+
+sys.exit(0)
