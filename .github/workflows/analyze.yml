@@ -1,4 +1,4 @@
-name: Malware Static Analysis Test
+name: Malware Static & AI Analysis Test
 
 on:
   push:
@@ -28,8 +28,12 @@ jobs:
     - name: Install Python dependencies
       run: |
         pip install --upgrade pip
-        pip install python-magic yara-python pefile
+        pip install python-magic yara-python pefile scikit-learn joblib
 
-    - name: Run Analyzer
+    - name: Step 1 - Run Static Analyzer
       run: |
-        python analyzer.py
+        python analyzer.py analyzer.py --output report.json
+
+    - name: Step 2 - Run AI Inference Engine
+      run: |
+        python ai_engine.py --report report.json
