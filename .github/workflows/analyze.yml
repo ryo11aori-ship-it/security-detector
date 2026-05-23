@@ -47,6 +47,10 @@ jobs:
         type report.json
         type ai_report.json
 
+    - name: Verify Final Risk Score
+      run: |
+        python -c "import json; d=json.load(open('ai_report.json')); print('=== 判定結果 ===\n最終スコア:', d['fusion']['final_risk_score'], '\nVerdict:', d['fusion']['verdict'])"
+
     - name: Upload Reports Artifact
       uses: actions/upload-artifact@v4
       with:
