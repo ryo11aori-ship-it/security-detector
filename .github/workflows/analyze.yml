@@ -1,16 +1,40 @@
+name: Malware Static Analysis Test
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+
     - name: Install system dependencies
       run: |
         sudo apt-get update
         sudo apt-get install -y libmagic1
 
-    - name: Check files (デバッグ用)
+    - name: Check files
       run: |
-        echo "=== 現在のディレクトリ位置 ==="
         pwd
-        echo "=== 存在するファイル一覧 ==="
         ls -la
 
     - name: Install Python dependencies
       run: |
         pip install --upgrade pip
         pip install -r requirements.txt
+
+    - name: Run Analyzer
+      run: |
+        python analyzer.py
