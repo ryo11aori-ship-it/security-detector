@@ -3,7 +3,6 @@
 
 import argparse
 import json
-import math
 import os
 import sys
 from pathlib import Path
@@ -19,7 +18,6 @@ try:
 except Exception:
     pefile = None
 
-
 class KaggleFeatureExtractor:
     VERSION = "4.0.0_kaggle_compatible"
     FEATURES = [
@@ -28,11 +26,9 @@ class KaggleFeatureExtractor:
         "SectionsNb", "SectionsMeanEntropy", "SectionsMaxEntropy",
         "ImportsNbDLL", "ImportsNb", "ExportNb"
     ]
-
     @property
     def feature_names(self) -> List[str]:
         return self.FEATURES
-
     def extract(self, file_path: str) -> List[float]:
         if not pefile or not os.path.exists(file_path):
             return [0.0] * len(self.FEATURES)
@@ -40,7 +36,6 @@ class KaggleFeatureExtractor:
             pe = pefile.PE(file_path, fast_load=False)
         except Exception:
             return [0.0] * len(self.FEATURES)
-
         machine = pe.FILE_HEADER.Machine
         size_opt = pe.FILE_HEADER.SizeOfOptionalHeader
         chars = pe.FILE_HEADER.Characteristics
@@ -48,37 +43,30 @@ class KaggleFeatureExtractor:
         size_code = pe.OPTIONAL_HEADER.SizeOfCode
         dll_chars = pe.OPTIONAL_HEADER.DllCharacteristics
         sec_nb = pe.FILE_HEADER.NumberOfSections
-
         entropies = [s.get_entropy() for s in pe.sections]
         sec_mean_ent = sum(entropies) / len(entropies) if entropies else 0.0
         sec_max_ent = max(entropies) if entropies else 0.0
-
         imports_dll = 0
         imports_nb = 0
         if hasattr(pe, 'DIRECTORY_ENTRY_IMPORT'):
             imports_dll = len(pe.DIRECTORY_ENTRY_IMPORT)
             imports_nb = sum(len(entry.imports) for entry in pe.DIRECTORY_ENTRY_IMPORT)
-
         export_nb = 0
         if hasattr(pe, 'DIRECTORY_ENTRY_EXPORT'):
             export_nb = len(pe.DIRECTORY_ENTRY_EXPORT.symbols)
-
         return [
             float(machine), float(size_opt), float(chars), float(maj_sub),
             float(size_code), float(dll_chars), float(sec_nb), float(sec_mean_ent),
             float(sec_max_ent), float(imports_dll), float(imports_nb), float(export_nb)
         ]
-
     def vector_as_dict(self, vector: List[float]) -> Dict[str, float]:
         return dict(zip(self.feature_names, vector))
-
 
 class LocalAIEngine:
     def __init__(self, model_path: str):
         self.model_path = Path(model_path)
         self.model: Any = None
         self.metadata: Dict[str, Any] = {}
-
     def load(self, expected_features: List[str]) -> bool:
         if not joblib:
             self.metadata = {"error": "joblib is not installed"}
@@ -99,7 +87,6 @@ class LocalAIEngine:
             self.model = None
             return False
         return True
-
     def predict(self, vector: List[float]) -> Dict[str, Any]:
         if self.model is None:
             return {"available": False, "error": self.metadata.get("error", "model not loaded")}
@@ -115,7 +102,6 @@ class LocalAIEngine:
             }
         except Exception as e:
             return {"available": False, "error": str(e), "model_metadata": self.metadata}
-
 
 class RiskFusion:
     def fuse(self, report: Dict[str, Any], ai_result: Dict[str, Any]) -> Dict[str, Any]:
@@ -141,7 +127,6 @@ class RiskFusion:
             "verdict": self.verdict(final_score),
             "fusion_policy": "50% heuristic + 50% Real-Data AI"
         }
-
     def verdict(self, score: int) -> str:
         if score >= 85: return "critical"
         if score >= 65: return "high"
@@ -149,10 +134,10 @@ class RiskFusion:
         if score >= 15: return "low"
         return "minimal"
 
-
 def main() -> int:
     parser = argparse.ArgumentParser(description="Offline local AI risk engine")
-    parser.add_argument("--report", required=True, help="JSON report from offline_file_risk_analyzer.py")
+    parser.add_argument("--report", required=True, help="JSON report from analyzer")
+    parser.add_argument("--target", required=True, help="Target PE file to analyze")
     parser.add_argument("--model", default="model_rf.pkl")
     parser.add_argument("--output", default=None)
     args = parser.parse_args()
@@ -163,11 +148,9 @@ def main() -> int:
 
     with open(args.report, "r", encoding="utf-8") as f:
         report = json.load(f)
-
-    target_file = report.get("core", {}).get("path", "")
     
     extractor = KaggleFeatureExtractor()
-    vector = extractor.extract(target_file)
+    vector = extractor.extract(args.target)
 
     engine = LocalAIEngine(args.model)
     engine.load(extractor.feature_names)
@@ -177,7 +160,7 @@ def main() -> int:
     output = {
         "engine": {
             "name": "Offline Local AI Engine",
-            "version": "4.0.0",
+            "version": "4.1.0",
             "mode": "real_data_inference",
         },
         "ai_prediction": ai_prediction,
