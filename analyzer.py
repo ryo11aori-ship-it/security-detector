@@ -119,9 +119,15 @@ class LocalMalwareAnalyzer:
         return json.dumps(final_report,indent=4)
 
 if __name__=="__main__":
-    pass
-    # テスト実行用のコード
-    # yara_dir="./yara_rules"
-    # os.makedirs(yara_dir,exist_ok=True)
-    # analyzer=LocalMalwareAnalyzer(yara_dir)
-    # print(analyzer.analyze_sample("sample.exe"))
+    yara_dir="./yara_rules"
+    os.makedirs(yara_dir,exist_ok=True)
+    analyzer=LocalMalwareAnalyzer(yara_dir)
+    
+    # テスト対象のファイルリスト
+    test_files = ["analyzer.py", "requirements.txt"]
+    
+    for target in test_files:
+        if os.path.exists(target):
+            print(f"=== ANALYSIS REPORT FOR {target} ===")
+            print(analyzer.analyze_sample(target))
+            print("="*40)
