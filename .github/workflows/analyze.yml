@@ -23,7 +23,7 @@ jobs:
     - name: Install Python dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install python-magic-bin yara-python pefile scikit-learn joblib pyinstaller
+        pip install python-magic-bin yara-python pefile scikit-learn joblib pyinstaller pandas
 
     - name: Step 0 - Build EXE from Python
       run: |
@@ -34,9 +34,9 @@ jobs:
       run: |
         python analyzer.py sample.exe --output report.json
 
-    - name: Step 1.5 - Create Dummy AI Model
+    - name: Step 1.5 - Train AI Model (Large Scale)
       run: |
-        python ai_engine.py --create-dummy-model --model model_rf.pkl
+        python train.py
 
     - name: Step 2 - Run AI Inference Engine & Fusion
       run: |
