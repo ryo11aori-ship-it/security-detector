@@ -9,7 +9,7 @@ on:
 
 jobs:
   analyze:
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
 
     steps:
     - name: Checkout repository
@@ -20,19 +20,19 @@ jobs:
       with:
         python-version: '3.10'
 
-    - name: Install system dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y libmagic1
-
     - name: Install Python dependencies
       run: |
-        pip install --upgrade pip
-        pip install python-magic yara-python pefile scikit-learn joblib
+        python -m pip install --upgrade pip
+        pip install python-magic-bin yara-python pefile scikit-learn joblib pyinstaller
+
+    - name: Step 0 - Build EXE from Python
+      run: |
+        pyinstaller --onefile sample.py
+        Copy-Item -Path dist\sample.exe -Destination .
 
     - name: Step 1 - Run Static Analyzer
       run: |
-        python analyzer.py analyzer.py --output report.json
+        python analyzer.py sample.exe --output report.json
 
     - name: Step 1.5 - Create Dummy AI Model
       run: |
