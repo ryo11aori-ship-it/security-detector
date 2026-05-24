@@ -248,6 +248,8 @@ class PEAnalyzer:
             "image_base": hex(pe.OPTIONAL_HEADER.ImageBase),
             "subsystem": getattr(pe.OPTIONAL_HEADER, "Subsystem", None),
             "dll_characteristics": hex(getattr(pe.OPTIONAL_HEADER, "DllCharacteristics", 0)),
+            "imphash": pe.get_imphash(),
+            "rich_header_hash": None,
             "sections": [],
             "imports": {},
             "suspicious_imports": [],
@@ -256,6 +258,12 @@ class PEAnalyzer:
             "has_resources": hasattr(pe, "DIRECTORY_ENTRY_RESOURCE"),
             "is_signed_hint": False,
         }
+
+        try:
+            if pe.parse_rich_header():
+                result["rich_header_hash"] = pe.get_rich_header_hash()
+        except Exception:
+            pass
 
         for section in pe.sections:
             name = section.Name.rstrip(b"\x00").decode("utf-8", "ignore")
@@ -330,7 +338,20 @@ class ScriptAnalyzer:
                 hits[name] = len(found)
 
         long_lines = [len(line) for line in text.splitlines() if len(line) > 500]
-        base64_blobs = re.findall(r"[A-Za-z0-9+/]{120,}={0,2}", text)
+        base64_blobs = re.findall(r"[A-Za-z0-9+/]{40,}={0,2}", text)
+        decoded_payloads = []
+
+        for blob in base64_blobs:
+            try:
+                decoded_str = base64.b64decode(blob).decode("utf-8", "ignore")
+                lowered = decoded_str.lower()
+                if any(x in lowered for x in ["http://", "https://", "powershell", "cmd.exe", "invoke-", "iex "]):
+                    decoded_payloads.append(decoded_str[:300])
+            except Exception:
+                pass
+
+        if decoded_payloads:
+            hits["hidden_payload_extracted"] = len(decoded_payloads)
 
         return {
             "line_count": text.count("\n") + 1 if text else 0,
@@ -338,6 +359,7 @@ class ScriptAnalyzer:
             "long_line_count": len(long_lines),
             "base64_blob_count": len(base64_blobs),
             "pattern_hits": hits,
+            "decoded_payloads": decoded_payloads,
         }
 
 
@@ -484,7 +506,26 @@ class HeuristicRiskEngine:
                     {"imports": suspicious_imports[:50]},
                 ))
 
+            if all(api in suspicious_imports for api in ["VirtualAlloc", "WriteProcessMemory", "CreateRemoteThread"]):
+                findings.append(Finding(
+                    "PE_PROCESS_INJECTION_TRIAD",
+                    "Classic process injection API triad detected",
+                    "critical",
+                    35,
+                    {"apis": ["VirtualAlloc", "WriteProcessMemory", "CreateRemoteThread"]}
+                ))
+
             for s in pe.get("sections", []):
+                s_name = s.get("name", "").lower()
+                if any(packer in s_name for packer in [".upx", ".vmp", ".aspack", ".themida"]):
+                    findings.append(Finding(
+                        "PE_KNOWN_PACKER_SECTION",
+                        f"Section name indicates known packer/protector: {s_name}",
+                        "high",
+                        20,
+                        {"section": s}
+                    ))
+
                 if s.get("entropy", 0) >= 7.2 and s.get("executable"):
                     findings.append(Finding(
                         "PE_PACKED_EXEC_SECTION",
@@ -531,11 +572,15 @@ class HeuristicRiskEngine:
                     "shell_spawn": 10,
                     "persistence": 16,
                     "obfuscation": 8,
+                    "hidden_payload_extracted": 30,
                 }.get(name, 5)
+
+                sev = "high" if name == "hidden_payload_extracted" else "medium"
+                
                 findings.append(Finding(
                     f"SCRIPT_{name.upper()}",
                     f"Suspicious script behavior pattern: {name}",
-                    "medium",
+                    sev,
                     weight,
                     {"count": count},
                 ))
@@ -678,7 +723,7 @@ class OfflineFileRiskAnalyzer:
         report: Dict[str, Any] = {
             "analyzer": {
                 "name": "Offline File Risk Analyzer",
-                "version": "2.0.0",
+                "version": "2.1.0",
                 "mode": "offline_static_only",
             },
             "core": self.core.analyze(path, data),
